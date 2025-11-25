@@ -9,5 +9,6 @@ class Embedder:
         return embeddings.tolist()
     
 if __name__ == "__main__":
+    """Example usage of the Embedder class."""
     e = Embedder()
     print(len(e.embed("Hello, world!"))) 

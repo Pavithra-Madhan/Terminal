@@ -1,0 +1,72 @@
+system:
+  name: "Parmira"
+  description: "Local terminal-first multi-agent assistant (Memory, RAG, Terminal) with MCP integration."
+  mode: "development"
+
+agents:
+  terminal_agent:
+    description: >
+      Interface agent. Executes MCP tool actions on the PC.
+      Receives curated outputs from memory_agent and rag_agent only.
+      NEVER accesses any database directly.
+      Optional Groq reasoning calls for advanced tasks.
+      Logs all actions and decisions.
+    prompts:
+      system: "config/agent_prompts.yaml"
+    tools:
+      - shell          # Execute shell commands
+      - fs             # File system operations
+      - spawn          # Spawn processes
+      - log_event      # Log actions/events
+      - call_reasoning_api  # Optional Groq API for reasoning
+
+  memory_agent:
+    description: >
+      Handles memory management for user/project data.
+      Accesses memory STM (SQLite) and LTM (Chroma) ONLY.
+      Performs scoring, storage, tombstoning, and retrieval alignment.
+      Outputs only to terminal_agent, never directly to user.
+    prompts:
+      system: "config/prompts.yaml"
+    tools:
+      - memory_add       # Score & classify messages
+      - add_to_sqlite    # Store in STM
+      - add_to_vector_db # Store in LTM
+      - run_tombstone_scan # Identify obsolete/conflicting memories
+      - log_event        # Log memory operations
+
+  rag_agent:
+    description: >
+      Retrieval-Augmented Generation agent.
+      Retrieves information from memory + system DBs (STM/LTM).
+      Filters duplicates and tombstoned items.
+      Produces curated reasoning bundles for terminal_agent.
+      Never modifies any database, never outputs to user.
+    prompts:
+      system: "config/rag_agent_prompt.yaml"
+    tools:
+      - search_vector_db    # Semantic search in vector DBs
+      - query_sqlite_memory # Query memory STM
+      - system_db_query     # Query system DB STM
+      - system_db_index_search # Query system DB LTM
+      - log_event           # Log retrieval actions
+
+databases:
+  memory:
+    stm: "db/memory_stm.sqlite"
+    ltm: "db/chroma_memory"
+  system:
+    stm: "system/system_stm.sqlite"
+    ltm: "db/chroma_system"
+
+logging:
+  path: "logs/"
+  enabled: true
+  max_size_mb: 20
+  rotate: true
+
+cooperation:
+  enforce_coordination: true
+  terminal_calls_agents_only: true
+  memory_agent_db_access: ["memory"]
+  rag_agent_db_access: ["memory", "system"]

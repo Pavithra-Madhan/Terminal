@@ -1,4 +1,5 @@
 from .memory_db import MemoryDB
+from db.chroma_memory import ChromaMemory
 from system.logger import memory_logger
 from langchain.tools import tool 
 
@@ -6,6 +7,7 @@ from langchain.tools import tool
 # Instantiate MemoryDB once for agent use
 # ===========================
 memory_db = MemoryDB()
+chroma_db = ChromaMemory()
 
 # ===========================
 # LLM-callable tools
@@ -40,8 +42,25 @@ def fetch_all_memories():
     return results
 
 # ===========================
+# LTM (Chroma) tools
+# ===========================
+
+@tool("store_ltm_memory")
+def store_ltm_memory(content: str):
+    chroma_db.add(content)
+    memory_logger.info(f"Stored LTM memory: {content[:50]}")
+    return f"LTM memory stored: {content[:50]}..."
+
+@tool("search_ltm_memory")
+def search_ltm_memory(query: str):
+    results = chroma_db.query(query)
+    memory_logger.info(f"Searched LTM for '{query}', found {len(results)} results")
+    return results
+
+# ===========================
 # Optional: cleanup (internal)
 # ===========================
+
 def close_memory():
     """Close DB connection (internal use)."""
     memory_db.close()

@@ -92,6 +92,47 @@ def test_terminal_agent(cfg):
     print("Simulated RAG Output:", rag_bundle)
     print("Output:\n", output)
 
+def test_coordination(cfg):
+    print("\n===== COORDINATION TEST =====\n")
+    
+    # Memory Agent
+    mem_sys = cfg["memory_prompts"]["memory_agent"]["system_prompt"]
+    mem_user_template = cfg["memory_prompts"]["memory_agent"]["user_prompt"]
+    mem_input = "Evaluate the user's plan to integrate Parmira in daily life."
+    mem_user_prompt = mem_user_template.replace("{{user_input}}", mem_input)
+    mem_out = call_model(mem_sys, mem_user_prompt)
+    print("Memory Agent Input:", mem_input)
+    print("Memory Agent Output:\n", mem_out)
+    
+    # RAG Agent
+    rag_sys = cfg["rag_prompts"]["rag_agent"]["system_prompt"]
+    rag_user_template = cfg["rag_prompts"]["rag_agent"]["user_prompt"]
+    rag_input = """
+Retrieval request: "What is Parmira's role in user's workflow?"
+--- MOCK RETRIEVED ---
+LTM: Parmira is a multi-agent assistant.
+STM: Focus on Memory + Terminal agents.
+SYSTEM: YAML manages routing.
+"""
+    rag_user_prompt = rag_user_template.replace("{{user_input}}", rag_input)
+    rag_out = call_model(rag_sys, rag_user_prompt)
+    print("RAG Agent Input:", rag_input)
+    print("RAG Agent Output:\n", rag_out)
+    
+    # Terminal Agent
+    term_sys = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
+    term_user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]
+    term_input = {
+        "curated_context": ["User wants a project directory structure."],
+        "needed_action": "list_files",
+        "path": "."
+    }
+    term_user_prompt = term_user_template.replace("{{rag_output}}", json.dumps(term_input, indent=2))
+    term_out = call_model(term_sys, term_user_prompt)
+    print("Terminal Agent Input:", term_input)
+    print("Terminal Agent Output:\n", term_out)
+
+
 # ==============================================================================  
 # MAIN
 # ==============================================================================  
@@ -114,9 +155,10 @@ def main():
         configs[key] = data
 
     print("\n=== Starting Tests ===")
-    test_memory_agent(configs)
-    test_rag_agent(configs)
-    test_terminal_agent(configs)
+    #test_memory_agent(configs)
+    #test_rag_agent(configs)
+    #test_terminal_agent(configs)
+    test_coordination(configs)
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,3 @@
-
 === Loading YAML Configs ===
 Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
 [INFO] Loaded YAML: memory_prompts.yaml
@@ -185,4 +184,3 @@ File created successfully:
       "memory_db_updated": true,
       "tombstone_action_taken": false
     },
-   

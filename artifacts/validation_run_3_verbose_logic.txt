@@ -1,0 +1,47 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/rag_prompts.yaml
+[INFO] Loaded YAML: rag_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/terminal_prompts.yaml
+[INFO] Loaded YAML: terminal_prompts.yaml
+
+=== Starting Tests ===
+
+===== MEMORY AGENT TEST =====
+User Input: Hello, Parmira! How can you assist me today?
+Output:
+ **Evaluation and Processing**
+
+1. **Relevance Evaluation**: The user's message is a greeting, which is considered small talk or filler conversation. Based on the scoring rules, this would be rated as **Low (2/10)**.
+
+2. **Pre-storage Checks**: 
+   - **Query Memory STM**: Recent messages in STM do not indicate any specific tasks or topics that require immediate attention or context.
+   - **Query Memory LTM**: Long-term facts in LTM do not provide specific information relevant to this greeting.
+   - **Comparison**: The new information (greeting) does not add significant value or contradict existing memories.
+
+3. **Storage Decision**: Given the low relevance score (2/10), the message does not meet the criteria for storage in either STM or LTM. **Storage Decision: ignore**.
+
+4. **Tombstone Action**: No tombstone action is necessary as the message does not correct, contradict, or update existing memories.
+
+5. **Output to Terminal Agent**: Since the message is ignored and does not lead to any updates in the memory databases, the structured output reflects this decision.
+
+**Output to Terminal Agent:**
+
+```json
+{
+  "relevance_score": 2,
+  "storage_decision": "ignore",
+  "summary_for_LTM": "",
+  "memory_db_updated": false,
+  "tombstone_action_taken": false,
+  "output_for_terminal_agent": "Greeting acknowledged. Ready to assist."
+}
+```
+
+**Logging**: 
+- **Action**: Evaluated and ignored greeting message.
+- **Decision**: Message relevance was scored low; hence, it was not stored in memory databases.
+
+**Terminal Agent Notification**: The user has been acknowledged, and the system is ready to assist with further queries or tasks.

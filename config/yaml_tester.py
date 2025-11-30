@@ -52,12 +52,22 @@ def test_memory_agent(cfg):
     sys_prompt = cfg["memory_prompts"]["memory_agent"]["system_prompt"]
     user_template = cfg["memory_prompts"]["memory_agent"]["user_prompt"]
 
-    test_input = "Parmira will eventually become my real-world assistant."
-    user_prompt = user_template.replace("{{user_input}}", test_input)
+    # Multiple test inputs for repetitive testing
+    test_inputs = [
+        "I'm actually allergic to penicillin, so never suggest any medications",
+        "Is it related to my previous symptoms?",
+        "I prefer dark mode for all my coding applications",
+        "Hello, Parmira! How can you assist me today?",
+        "I think I might want to learn Spanish next year"
+    ]
 
-    output = call_model(sys_prompt, user_prompt)
-    print("User Input:", test_input)
-    print("Output:\n", output)
+    for i, test_input in enumerate(test_inputs, 1):
+        print(f"\n--- Test {i} ---")
+        user_prompt = user_template.replace("{{user_input}}", test_input)
+        output = call_model(sys_prompt, user_prompt)
+        print("User Input:", test_input)
+        print("Output:\n", output)
+        print("-" * 50)
 
 def test_rag_agent(cfg):
     print("\n===== RAG AGENT TEST =====")
@@ -155,10 +165,10 @@ def main():
         configs[key] = data
 
     print("\n=== Starting Tests ===")
-    #test_memory_agent(configs)
+    test_memory_agent(configs)
     #test_rag_agent(configs)
     #test_terminal_agent(configs)
-    test_coordination(configs)
+    #test_coordination(configs)
 
 if __name__ == "__main__":
     main()

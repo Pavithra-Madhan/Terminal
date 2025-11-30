@@ -1,55 +1,47 @@
 system:
   name: "Parmira"
-  description: "Local terminal-first multi-agent assistant (Memory, RAG, Terminal) with MCP integration."
+  description: "Local terminal-first AI assistant with MCP integration."
   mode: "development"
 
 agents:
   terminal_agent:
     description: >
-      Interface agent. Executes MCP tool actions on the PC.
-      Receives curated outputs from memory_agent and rag_agent only.
-      NEVER accesses any database directly.
-      Optional Groq reasoning calls for advanced tasks.
-      Logs all actions and decisions.
+      Master coordinator. Uses MCP Cursor for all system interactions - 
+      terminal commands, file operations, processes, and more.
+      Can query SQLite databases freely (read-only) and calls RAG when semantic search needed.
+      Makes all final decisions and communicates with user.
     prompts:
-      system: "config/agent_prompts.yaml"
+      system: "config/terminal_prompts.yaml"
     tools:
-      - shell          # Execute shell commands
-      - fs             # File system operations
-      - spawn          # Spawn processes
-      - log_event      # Log actions/events
-      - call_reasoning_api  # Optional Groq API for reasoning
+      - mcp_cursor              # Access to all system tools via MCP
+      - sqlite_query            # Direct SQLite queries (read-only)
+      - call_rag_agent          # Call RAG when semantic search needed
 
   memory_agent:
     description: >
-      Handles memory management for user/project data.
-      Accesses memory STM (SQLite) and LTM (Chroma) ONLY.
-      Performs scoring, storage, tombstoning, and retrieval alignment.
-      Outputs only to terminal_agent, never directly to user.
+      Memory specialist. Automatically scores and stores every user message.
+      Runs in background - no coordination needed.
+      Handles STM/LTM storage and tombstoning independently.
     prompts:
-      system: "config/prompts.yaml"
+      system: "config/memory_prompts.yaml"
     tools:
-      - memory_add       # Score & classify messages
-      - add_to_sqlite    # Store in STM
-      - add_to_vector_db # Store in LTM
-      - run_tombstone_scan # Identify obsolete/conflicting memories
-      - log_event        # Log memory operations
+      - memory_add              # Score & classify messages
+      - add_to_sqlite           # Store in STM
+      - add_to_vector_db        # Store in LTM
+      - run_tombstone_scan      # Identify obsolete/conflicting memories
 
   rag_agent:
     description: >
-      Retrieval-Augmented Generation agent.
-      Retrieves information from memory + system DBs (STM/LTM).
-      Filters duplicates and tombstoned items.
-      Produces curated reasoning bundles for terminal_agent.
-      Never modifies any database, never outputs to user.
+      Retrieval specialist. Called only when Terminal needs semantic search.
+      Searches Memory + System databases and returns curated results.
+      Never modifies databases, never outputs to user directly.
     prompts:
-      system: "config/rag_agent_prompt.yaml"
+      system: "config/rag_prompts.yaml"
     tools:
-      - search_vector_db    # Semantic search in vector DBs
-      - query_sqlite_memory # Query memory STM
-      - system_db_query     # Query system DB STM
-      - system_db_index_search # Query system DB LTM
-      - log_event           # Log retrieval actions
+      - search_vector_db        # Semantic search in vector DBs
+      - query_sqlite_memory     # Query memory STM
+      - system_db_query         # Query system DB STM
+      - system_db_index_search  # Query system DB LTM
 
 databases:
   memory:
@@ -66,7 +58,7 @@ logging:
   rotate: true
 
 cooperation:
-  enforce_coordination: true
-  terminal_calls_agents_only: true
+  enforce_coordination: false    # No complex coordination
+  terminal_can_query_dbs: true   # Terminal can query SQLite directly
   memory_agent_db_access: ["memory"]
   rag_agent_db_access: ["memory", "system"]

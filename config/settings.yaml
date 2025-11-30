@@ -1,6 +1,6 @@
 system:
   name: "Parmira"
-  description: "Local terminal-first AI assistant with MCP integration."
+  description: "Terminal-first AI assistant with MCP integration."
   mode: "development"
 
 agents:

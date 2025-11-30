@@ -82,10 +82,10 @@ def test_terminal_agent(cfg):
     sys_prompt = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
     user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]
 
-    test_input = """I'm getting a 'port 3000 already in use' error when running my React app, 
-                  but I also need to check if there are any environment variables missing 
-                 from my .env file compared to .env.example, and while you're at it, 
-                find any large files (>100MB) in the node_modules that I might want to clean up."""
+    test_input = """I need to find all the Python files in my project that 
+    I've modified in the last 7 days, but only the ones that contain 'TODO' comments. 
+    Also, show me which of these files have corresponding test files in 
+    the tests/ directory."""
     user_prompt = user_template.replace("{{user_input}}", test_input)
 
     output = call_model(sys_prompt, user_prompt)

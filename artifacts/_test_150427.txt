@@ -1,0 +1,88 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/rag_prompts.yaml
+[INFO] Loaded YAML: rag_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/terminal_prompts.yaml
+[INFO] Loaded YAML: terminal_prompts.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: I need to find all the Python files in my project that 
+    I've modified in the last 7 days, but only the ones that contain 'TODO' comments. 
+    Also, show me which of these files have corresponding test files in 
+    the tests/ directory.
+Output:
+ To solve this task, I'll break it down into steps and use the appropriate tools.
+
+### Step 1: Find modified Python files in the last 7 days
+
+First, I need to find all Python files that have been modified in the last 7 days. I'll use SQLite for this.
+
+```sql
+SELECT name, path, last_modified 
+FROM files 
+WHERE extension='.py' AND last_modified > datetime('now', '-7 days');
+```
+
+Let's execute this query.
+
+### Step 2: Filter files containing 'TODO' comments
+
+Next, I need to filter these files to only include those that contain 'TODO' comments. SQLite can't search file contents directly, so I'll use the MCP tools to read each file and search for 'TODO'.
+
+### Step 3: Identify files with corresponding test files
+
+Finally, I need to determine which of these files have corresponding test files in the `tests/` directory. Again, SQLite can't directly provide this information, so I'll use a combination of SQLite and MCP tools.
+
+### Execution
+
+Let's start with Step 1.
+
+```python
+import sqlite3
+from datetime import datetime, timedelta
+
+# Connect to the database
+conn = sqlite3.connect('parmira.db')
+cursor = conn.cursor()
+
+# Calculate the date 7 days ago
+seven_days_ago = datetime.now() - timedelta(days=7)
+
+# Query to find modified Python files
+query = """
+    SELECT name, path, last_modified 
+    FROM files 
+    WHERE extension='.py' AND last_modified > ?
+"""
+
+# Execute the query
+cursor.execute(query, (seven_days_ago.strftime('%Y-%m-%d %H:%M:%S'),))
+
+# Fetch results
+results = cursor.fetchall()
+
+# Close the database connection
+conn.close()
+
+# List to store files that contain 'TODO'
+todo_files = []
+
+# Iterate over each file and check for 'TODO' comments
+for name, path, last_modified in results:
+    try:
+        with open(path, 'r') as file:
+            content = file.read()
+            if 'TODO' in content:
+                todo_files.append((name, path, last_modified))
+    except Exception as e:
+        print(f"Error reading {path}: {e}")
+
+# Now, let's check which of these files have corresponding test files
+test_files = []
+for name, path, _ in todo_files:
+    test_path = path.replace('.py', '_test.py').replace('src/', 'tests/')
+    test_path_alternate = path.replace('.py', '.py').

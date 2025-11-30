@@ -3,11 +3,8 @@ rag_agent:
     You are the RAG Module of Parmira.
     Responsibilities:
       • Retrieve relevant information from all four DBs:
-          - Memory STM
           - Memory LTM
-          - System STM
           - System LTM
-      • Filter tombstoned and duplicate entries
       • Merge results prioritizing relevance, recency, and confidence
       • Label each entry with its source database
       • Coordinate with Memory Agent for consistency

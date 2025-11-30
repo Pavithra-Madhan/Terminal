@@ -52,22 +52,12 @@ def test_memory_agent(cfg):
     sys_prompt = cfg["memory_prompts"]["memory_agent"]["system_prompt"]
     user_template = cfg["memory_prompts"]["memory_agent"]["user_prompt"]
 
-    # Multiple test inputs for repetitive testing
-    test_inputs = [
-        "I'm actually allergic to penicillin, so never suggest any medications",
-        "Is it related to my previous symptoms?",
-        "I prefer dark mode for all my coding applications",
-        "Hello, Parmira! How can you assist me today?",
-        "I think I might want to learn Spanish next year"
-    ]
+    test_input = "I'm actually allergic to penicillin, so never suggest any medications"
+    user_prompt = user_template.replace("{{user_input}}", test_input)
 
-    for i, test_input in enumerate(test_inputs, 1):
-        print(f"\n--- Test {i} ---")
-        user_prompt = user_template.replace("{{user_input}}", test_input)
-        output = call_model(sys_prompt, user_prompt)
-        print("User Input:", test_input)
-        print("Output:\n", output)
-        print("-" * 50)
+    output = call_model(sys_prompt, user_prompt)
+    print("User Input:", test_input)
+    print("Output:\n", output)
 
 def test_rag_agent(cfg):
     print("\n===== RAG AGENT TEST =====")
@@ -92,6 +82,17 @@ def test_terminal_agent(cfg):
     sys_prompt = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
     user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]
 
+    test_input = """I'm getting a 'port 3000 already in use' error when running my React app, 
+                  but I also need to check if there are any environment variables missing 
+                 from my .env file compared to .env.example, and while you're at it, 
+                find any large files (>100MB) in the node_modules that I might want to clean up."""
+    user_prompt = user_template.replace("{{user_input}}", test_input)
+
+    output = call_model(sys_prompt, user_prompt)
+    print("User Input:", test_input)
+    print("Output:\n", output)
+    """"
+
     rag_bundle = {
         "curated_context": ["User wants project file structure."],
         "needed_action": "list_files",
@@ -101,7 +102,7 @@ def test_terminal_agent(cfg):
     output = call_model(sys_prompt, user_prompt)
     print("Simulated RAG Output:", rag_bundle)
     print("Output:\n", output)
-
+"""
 def test_coordination(cfg):
     print("\n===== COORDINATION TEST =====\n")
     
@@ -165,12 +166,10 @@ def main():
         configs[key] = data
 
     print("\n=== Starting Tests ===")
-    test_memory_agent(configs)
+    #test_memory_agent(configs)
     #test_rag_agent(configs)
-    #test_terminal_agent(configs)
+    test_terminal_agent(configs)
     #test_coordination(configs)
 
 if __name__ == "__main__":
     main()
-
-

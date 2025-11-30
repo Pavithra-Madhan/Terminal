@@ -1,0 +1,96 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/rag_prompts.yaml
+[INFO] Loaded YAML: rag_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/terminal_prompts.yaml
+[INFO] Loaded YAML: terminal_prompts.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: I'm getting a 'port 3000 already in use' error when running my React app, 
+                  but I also need to check if there are any environment variables missing 
+                 from my .env file compared to .env.example, and while you're at it, 
+                find any large files (>100MB) in the node_modules that I might want to clean up.
+Output:
+ To address the user's request, I'll break down the task into steps and use the appropriate tools.
+
+### Step 1: Find the process using port 3000
+
+First, I need to find out which process is using port 3000. I can use the `lsof` command to achieve this.
+
+```bash
+lsof -i :3000
+```
+
+Let's execute this command using the MCP tools.
+
+```python
+import subprocess
+
+# Execute the command to find the process using port 3000
+result = subprocess.run(["lsof", "-i", ":3000"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+# Print the result
+print(result.stdout.decode())
+```
+
+### Step 2: Compare .env and .env.example files
+
+Next, I need to compare the .env file with the .env.example file to check for any missing environment variables. 
+
+I'll use the MCP tools to read the files and compare their contents.
+
+```python
+import os
+
+# Define the file paths
+env_file_path = ".env"
+env_example_file_path = ".env.example"
+
+# Read the files
+try:
+    with open(env_file_path, "r") as f:
+        env_variables = set(line.strip().split("=")[0] for line in f.readlines() if line.strip())
+
+    with open(env_example_file_path, "r") as f:
+        env_example_variables = set(line.strip().split("=")[0] for line in f.readlines() if line.strip())
+
+    # Find missing environment variables
+    missing_variables = env_example_variables - env_variables
+
+    # Print the result
+    if missing_variables:
+        print(f"Missing environment variables in .env: {missing_variables}")
+    else:
+        print("No missing environment variables in .env")
+
+except FileNotFoundError:
+    print("One or both files not found.")
+```
+
+### Step 3: Find large files in node_modules
+
+Finally, I need to find any large files (>100MB) in the node_modules directory.
+
+I'll use the `find` command to achieve this.
+
+```bash
+find node_modules -type f -size +100M
+```
+
+Let's execute this command using the MCP tools.
+
+```python
+import subprocess
+
+# Execute the command to find large files in node_modules
+result = subprocess.run(["find", "node_modules", "-type", "f", "-size", "+100M"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+# Print the result
+print(result.stdout.decode())
+```
+
+

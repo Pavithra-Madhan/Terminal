@@ -1,0 +1,22 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/ultra_strict_terminal_agent.yaml
+[INFO] Loaded YAML: ultra_strict_terminal_agent.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: Which three files, modified before 2025-10-01, contain functions related to 'asynchronous logging' and what are their file sizes?
+Output:
+ ```json
+{
+  "tool_calls": [
+    {
+      "tool_call": "rag_call",
+      "query": "files modified before 2025-10-01 with functions related to asynchronous logging"
+    }
+  ]
+}
+```

@@ -59,33 +59,12 @@ def test_memory_agent(cfg):
     print("User Input:", test_input)
     print("Output:\n", output)
 
-def test_rag_agent(cfg):
-    print("\n===== RAG AGENT TEST =====")
-    sys_prompt = cfg["rag_prompts"]["rag_agent"]["system_prompt"]
-    user_template = cfg["rag_prompts"]["rag_agent"]["user_prompt"]
-
-    mock_data = """
-Retrieval request: "What is Parmira's purpose?"
-
---- MOCK RETRIEVED ---
-LTM: Parmira is intended as a multi-agent system.
-STM: Focus on Memory + Terminal agents.
-SYSTEM: YAML controls routing.
-"""
-    user_prompt = user_template.replace("{{user_input}}", mock_data)
-    output = call_model(sys_prompt, user_prompt)
-    print("Mock Retrieval:", mock_data)
-    print("Output:\n", output)
-
 def test_terminal_agent(cfg):
     print("\n===== TERMINAL AGENT TEST =====")
     sys_prompt = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
     user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]
 
-    test_input = """I need to find all the Python files in my project that 
-    I've modified in the last 7 days, but only the ones that contain 'TODO' comments. 
-    Also, show me which of these files have corresponding test files in 
-    the tests/ directory."""
+    test_input = """Which three files, modified before 2025-10-01, contain functions related to 'asynchronous logging' and what are their file sizes?"""
     user_prompt = user_template.replace("{{user_input}}", test_input)
 
     output = call_model(sys_prompt, user_prompt)
@@ -103,46 +82,6 @@ def test_terminal_agent(cfg):
     print("Simulated RAG Output:", rag_bundle)
     print("Output:\n", output)
 """
-def test_coordination(cfg):
-    print("\n===== COORDINATION TEST =====\n")
-    
-    # Memory Agent
-    mem_sys = cfg["memory_prompts"]["memory_agent"]["system_prompt"]
-    mem_user_template = cfg["memory_prompts"]["memory_agent"]["user_prompt"]
-    mem_input = "Evaluate the user's plan to integrate Parmira in daily life."
-    mem_user_prompt = mem_user_template.replace("{{user_input}}", mem_input)
-    mem_out = call_model(mem_sys, mem_user_prompt)
-    print("Memory Agent Input:", mem_input)
-    print("Memory Agent Output:\n", mem_out)
-    
-    # RAG Agent
-    rag_sys = cfg["rag_prompts"]["rag_agent"]["system_prompt"]
-    rag_user_template = cfg["rag_prompts"]["rag_agent"]["user_prompt"]
-    rag_input = """
-Retrieval request: "What is Parmira's role in user's workflow?"
---- MOCK RETRIEVED ---
-LTM: Parmira is a multi-agent assistant.
-STM: Focus on Memory + Terminal agents.
-SYSTEM: YAML manages routing.
-"""
-    rag_user_prompt = rag_user_template.replace("{{user_input}}", rag_input)
-    rag_out = call_model(rag_sys, rag_user_prompt)
-    print("RAG Agent Input:", rag_input)
-    print("RAG Agent Output:\n", rag_out)
-    
-    # Terminal Agent
-    term_sys = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
-    term_user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]
-    term_input = {
-        "curated_context": ["User wants a project directory structure."],
-        "needed_action": "list_files",
-        "path": "."
-    }
-    term_user_prompt = term_user_template.replace("{{rag_output}}", json.dumps(term_input, indent=2))
-    term_out = call_model(term_sys, term_user_prompt)
-    print("Terminal Agent Input:", term_input)
-    print("Terminal Agent Output:\n", term_out)
-
 
 # ==============================================================================  
 # MAIN
@@ -152,8 +91,7 @@ def main():
     print("\n=== Loading YAML Configs ===")
     config_files = {
         "memory_prompts": CONFIG_DIR / "memory_prompts.yaml",
-        "rag_prompts": CONFIG_DIR / "rag_prompts.yaml",
-        "terminal_prompts": CONFIG_DIR / "terminal_prompts.yaml",
+        "terminal_prompts": CONFIG_DIR / "ultra_strict_terminal_agent.yaml",
     }
 
     configs = {}

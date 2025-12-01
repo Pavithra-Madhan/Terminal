@@ -1,0 +1,46 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/ultra_strict_terminal_agent.yaml
+[INFO] Loaded YAML: ultra_strict_terminal_agent.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: I need to find all the Python files in my project that 
+    I've modified in the last 7 days, but only the ones that contain 'TODO' comments. 
+    Also, show me which of these files have corresponding test files in 
+    the tests/ directory.
+Output:
+ ```json
+{
+  "tool_calls": [
+    {
+      "tool_call": "shell_command",
+      "query": "find . -name '*.py' -mtime -7 -exec grep -l 'TODO' {} \\; | grep -v '^tests/'"
+    },
+    {
+      "tool_calls": "shell_command",
+      "query": "find . -name '*.py' -mtime -7 -exec grep -l 'TODO' {} \\; | grep '^tests/'"
+    }
+  ]
+}
+``` 
+I will revise to 
+
+
+```json
+{
+  "tool_calls": [
+    {
+      "tool_call": "shell_command",
+      "query": "find . -name '*.py' -mtime -7 -exec grep -l 'TODO' {} \\; | grep -v '^tests/'"
+    },
+    {
+      "tool_call": "shell_command",
+      "query": "find tests -name 'test_*.py' -printf '%f\n' | grep -v '^tests/'"
+    }
+  ]
+}
+```

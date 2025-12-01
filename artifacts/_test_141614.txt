@@ -1,0 +1,37 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/defensive_terminal_prompts.yaml
+[INFO] Loaded YAML: defensive_terminal_prompts.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: Find and analyze the error logs from our API gateway containers that crashed yesterday. First check the standard Docker logs location, but if those are rotated or missing, look for any core dump files in /var/crash, and if that doesn't work, search through our centralized logging system in /mnt/logs/aggregated/. Also, check if there are any incident reports filed about this in our wiki at /wiki/incidents.
+Output:
+ ## BASH (DOING)
+
+```bash
+# Check standard Docker logs location
+docker logs --since=yesterday $(docker ps -aq --filter name=api-gateway) 2>/dev/null | grep error
+
+# If logs are rotated or missing, look for core dump files
+if [ $? -ne 0 ]; then
+    if [ -d "/var/crash" ]; then
+        find /var/crash -name "core.*" -type f -print -exec file {} \;
+    fi
+fi
+
+# Search through centralized logging system
+if [ $? -ne 0 ]; then
+    if [ -d "/mnt/logs/aggregated" ]; then
+        find /mnt/logs/aggregated -name "*.log" -type f -print -exec grep error {} \;
+    fi
+fi
+
+# Check for incident reports in wiki
+if [ -d "/wiki/incidents" ]; then
+    find /wiki/incidents -name "*.md" -type f -print -exec grep -i "api-gateway crash" {} \;
+fi
+```

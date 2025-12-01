@@ -64,7 +64,7 @@ def test_terminal_agent(cfg):
     sys_prompt = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
     user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]
 
-    test_input = """Explain the design rationale behind using the custom 'Hyperdrive' caching layer instead of Redis in the Authentication microservice. Include the specific trade-offs we accepted for performance, and cite the architectural decision document."""
+    test_input = """Find and analyze the error logs from our API gateway containers that crashed yesterday. First check the standard Docker logs location, but if those are rotated or missing, look for any core dump files in /var/crash, and if that doesn't work, search through our centralized logging system in /mnt/logs/aggregated/. Also, check if there are any incident reports filed about this in our wiki at /wiki/incidents."""
     user_prompt = user_template.replace("{{user_input}}", test_input)
 
     output = call_model(sys_prompt, user_prompt)

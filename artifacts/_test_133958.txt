@@ -1,0 +1,15 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/ultra_strict_terminal_agent.yaml
+[INFO] Loaded YAML: ultra_strict_terminal_agent.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: I'm feeling overwhelmed with technical debt in our authentication middleware. Can you find patterns in our codebase where we might be reinventing the wheel instead of using established libraries? Look for areas where the solution seems more complex than necessary, especially around JWT validation, session management, and rate limiting.
+Output:
+ ```json
+{"tool_calls": "rag_call", "query": "reinventing the wheel authentication middleware JWT validation session management rate limiting"}
+```

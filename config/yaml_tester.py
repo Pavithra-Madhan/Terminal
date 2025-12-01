@@ -64,10 +64,7 @@ def test_terminal_agent(cfg):
     sys_prompt = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
     user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]
 
-    test_input = """First, find all Docker containers that have been running 
-    for more than 24 hours and are using more than 1GB of RAM. Then, search through 
-    their logs for any 'error' or 'warning' messages from the last 3 days. Finally, check if any of these containers have corresponding .yml or .yaml 
-    config files in our projects directory that might need updating."""
+    test_input = """Explain the design rationale behind using the custom 'Hyperdrive' caching layer instead of Redis in the Authentication microservice. Include the specific trade-offs we accepted for performance, and cite the architectural decision document."""
     user_prompt = user_template.replace("{{user_input}}", test_input)
 
     output = call_model(sys_prompt, user_prompt)
@@ -94,7 +91,7 @@ def main():
     print("\n=== Loading YAML Configs ===")
     config_files = {
         "memory_prompts": CONFIG_DIR / "memory_prompts.yaml",
-        "terminal_prompts": CONFIG_DIR / "ultra_strict_terminal_agent.yaml",
+        "terminal_prompts": CONFIG_DIR / "defensive_terminal_prompts.yaml",
     }
 
     configs = {}

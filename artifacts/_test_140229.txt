@@ -1,0 +1,53 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/defensive_terminal_prompts.yaml
+[INFO] Loaded YAML: defensive_terminal_prompts.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: Parse through all our server logs from the last week, extract any error messages containing 'timeout' or 'connection refused', then find which microservice configuration files might be causing these issues by searching for timeout settings, retry configurations, or connection pool parameters. Also check if we have any runbooks or documentation that explain how to fix these specific error patterns.
+Output:
+ ```bash
+# Define log directory and time frame
+LOG_DIR="/var/log"
+TIME_FRAME="-7"
+
+# Check if log directory exists
+if [ -d "$LOG_DIR" ]; then
+    # Find log files from last week
+    LOG_FILES=$(find "$LOG_DIR" -name "*.log" -mtime $TIME_FRAME)
+
+    # Extract error messages containing 'timeout' or 'connection refused'
+    ERROR_MESSAGES=$(grep -E 'error|Timeout|connection refused' $LOG_FILES)
+
+    # Check if any error messages were found
+    if [ -n "$ERROR_MESSAGES" ]; then
+        echo "Error messages found:"
+        echo "$ERROR_MESSAGES"
+
+        # Define config file locations
+        CONFIG_DIRS="/etc /usr/local/etc ~/.config"
+
+        # Search for timeout settings, retry configurations, or connection pool parameters
+        for dir in $CONFIG_DIRS; do
+            if [ -d "$dir" ]; then
+                find "$dir" -name "*.conf" -o -name "*.cfg" -o -name "*.json" -exec grep -E 'timeout|retry|connection pool' {} \;
+            fi
+        done
+
+        # Check for runbooks or documentation
+        if [ -d "/docs" ]; then
+            find "/docs" -name "*.md" -o -name "*.rst" -exec grep -E 'timeout|connection refused|retry' {} \;
+        fi
+    else
+        echo "No error messages found."
+    fi
+else
+    echo "Log directory not found. Try:"
+    echo "  sudo ls /var/log  # If permission issue"
+    echo "  find . -name '*.log'  # Search current directory"
+fi
+```

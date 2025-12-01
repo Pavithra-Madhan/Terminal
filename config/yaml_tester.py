@@ -64,7 +64,10 @@ def test_terminal_agent(cfg):
     sys_prompt = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
     user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]
 
-    test_input = """Which three files, modified before 2025-10-01, contain functions related to 'asynchronous logging' and what are their file sizes?"""
+    test_input = """I'm working on implementing a pub-sub system with event-driven 
+    architecture. Can you find any similar patterns or examples in our codebase that 
+    handle message queues, event broadcasting, or observer patterns? Look for code that 
+    might be architecturally similar even if it uses different terminology."""
     user_prompt = user_template.replace("{{user_input}}", test_input)
 
     output = call_model(sys_prompt, user_prompt)

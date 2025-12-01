@@ -1,0 +1,29 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/ultra_strict_terminal_agent.yaml
+[INFO] Loaded YAML: ultra_strict_terminal_agent.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: First, find all Docker containers that have been running 
+    for more than 24 hours and are using more than 1GB of RAM. Then, search through 
+    their logs for any 'error' or 'warning' messages from the last 3 days. Finally, check if any of these containers have corresponding .yml or .yaml 
+    config files in our projects directory that might need updating.
+Output:
+ ```bash
+# Find containers running for more than 24 hours and using more than 1GB of RAM
+CONTAINERS=$(docker ps -f "status=running" --format "{{.ID}}" | xargs -I {} docker inspect {} | jq '.[] | select(.State.Running && .State.StartedAt | fromiso8601 | now - . > 86400) | select(.HostConfig.MemoryUsage > 1073741824) | .ID' | tr -d '"')
+
+# Search logs for 'error' or 'warning' messages from the last 3 days
+for container in $CONTAINERS; do
+  docker logs $container --since 3d | grep -E 'error|warning'
+done
+
+# Check for corresponding .yml or .yaml config files
+for container in $CONTAINERS; do
+  find /projects -type f \( -name "$container.yml" -o -name "$container.yaml" \)
+done
+```

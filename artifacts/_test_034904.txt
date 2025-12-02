@@ -1,0 +1,70 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/hier_terminal_prompts.yaml
+[INFO] Loaded YAML: hier_terminal_prompts.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: I'm debugging a memory leak in our data processing pipeline. The symptoms started after we updated the Redis client library last Thursday. 
+
+First, I need to find all configuration files that might have Redis connection pool settings changed around that time. Check git history if available, otherwise look at file modification dates.
+
+Second, search through our performance monitoring dashboards documentation for any known issues with the new Redis library version 4.5.0.
+
+Third, check if there are any core dumps or heap snapshots from the crashed worker processes, probably in /var/crash or /opt/heapdumps.
+
+Fourth, look for any similar incidents in our past incident reports - I remember we had something similar 3 months ago with database connection pooling.
+
+Finally, check my personal notes from last month's performance tuning session - I think I documented some Redis tuning parameters that might be relevant.
+Output:
+ ### PRIMARY ACTION (Executable):
+To start debugging the memory leak issue, the first step is to find configuration files that might have Redis connection pool settings changed around the time of the library update last Thursday. The best tool for this initial step seems to be `SYSTEM_SQLITE` to quickly query file metadata, specifically looking for files modified around last Thursday.
+
+```sql
+SELECT path, last_modified FROM files 
+WHERE (name LIKE '%config%' OR name LIKE '%.env%' OR name LIKE '%.yaml%') 
+  AND last_modified >= DATE('now', '-10 days')
+LIMIT 10;
+```
+
+### FALLBACK STEPS (Hierarchy):
+
+1. **BASH Command** (If SQLite query results are incomplete or fail):
+   - Use `git log` and `git diff` to inspect changes in configuration files around the last Thursday.
+
+```bash
+git log --since="last Thursday" --pretty=format:"%ad %s" --date=short -- *.config *.env *.yaml
+```
+
+2. **SYSTEM_CHROMA Query** (For semantic search in documentation):
+   - Search through performance monitoring dashboards documentation for known issues with Redis library version 4.5.0.
+
+```json
+{"tool_calls": "system_chroma_query", "query": "performance monitoring dashboards issues Redis library version 4.5.0"}
+```
+
+3. **BASH Command** (For searching core dumps or heap snapshots):
+   - Look for core dumps or heap snapshots in `/var/crash` or `/opt/heapdumps`.
+
+```bash
+find /var/crash /opt/heapdumps -type f -name "core.*" -or -name "heapdump.*" -ls
+```
+
+4. **MEMORY_CHROMA Query** (For similar incidents in past reports):
+   - Search for similar incidents in past incident reports, specifically 3 months ago.
+
+```json
+{"tool_calls": "memory_chroma_query", "query": "similar incidents 3 months ago database connection pooling"}
+```
+
+5. **MEMORY_SQLITE Query** (For personal notes):
+   - Check personal notes from last month's performance tuning session for Redis tuning parameters.
+
+```json
+{"tool_calls": "memory_sqlite_query", "query": "Redis tuning parameters from last month's performance tuning session"}
+```
+
+This structured approach allows for efficient debugging by starting with quick metadata queries and escalating to more specific semantic searches or live system actions as needed.

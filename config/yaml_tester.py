@@ -64,7 +64,17 @@ def test_terminal_agent(cfg):
     sys_prompt = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
     user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]
 
-    test_input = """Our nightly deployment failed, and the rollback was blocked. The failure message mentioned an error in the `auth.py` file, specifically near the 'rate limiting middleware' function, which was recently refactored. Before checking the live logs, first see if there are any architecture documents in our codebase explaining the current rate limiting strategy (look for 'RateLimiter' or 'TokenBucket'). If that fails, find all python files modified in the last 48 hours containing the string 'JWT' or 'session' (indicating a change in authentication), and finally, verify if the deployment service is currently running."""
+    test_input = """I'm debugging a memory leak in our data processing pipeline. The symptoms started after we updated the Redis client library last Thursday. 
+
+First, I need to find all configuration files that might have Redis connection pool settings changed around that time. Check git history if available, otherwise look at file modification dates.
+
+Second, search through our performance monitoring dashboards documentation for any known issues with the new Redis library version 4.5.0.
+
+Third, check if there are any core dumps or heap snapshots from the crashed worker processes, probably in /var/crash or /opt/heapdumps.
+
+Fourth, look for any similar incidents in our past incident reports - I remember we had something similar 3 months ago with database connection pooling.
+
+Finally, check my personal notes from last month's performance tuning session - I think I documented some Redis tuning parameters that might be relevant."""
     user_prompt = user_template.replace("{{user_input}}", test_input)
 
     output = call_model(sys_prompt, user_prompt)

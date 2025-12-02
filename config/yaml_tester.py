@@ -91,7 +91,7 @@ def main():
     print("\n=== Loading YAML Configs ===")
     config_files = {
         "memory_prompts": CONFIG_DIR / "memory_prompts.yaml",
-        "terminal_prompts": CONFIG_DIR / "defensive_terminal_prompts.yaml",
+        "terminal_prompts": CONFIG_DIR / "hier_terminal_prompts.yaml",
     }
 
     configs = {}

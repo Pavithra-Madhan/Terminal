@@ -1,0 +1,77 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/hier_terminal_prompts.yaml
+[INFO] Loaded YAML: hier_terminal_prompts.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: Find and analyze the error logs from our API gateway containers that crashed yesterday. First check the standard Docker logs location, but if those are rotated or missing, look for any core dump files in /var/crash, and if that doesn't work, search through our centralized logging system in /mnt/logs/aggregated/. Also, check if there are any incident reports filed about this in our wiki at /wiki/incidents.
+Output:
+ ### PRIMARY APPROACH: DOCKER LOGS
+
+```bash
+# Check standard Docker logs location
+docker logs --since=yesterday --until=yesterday --details $(docker ps --filter status=exited --format '{{.Names}}') 2>/dev/null | grep -i error
+```
+
+### FALLBACK 1: CORE DUMP FILES
+
+If primary approach fails (e.g., logs are rotated or missing):
+```bash
+# Look for core dump files in /var/crash
+find /var/crash -type f -name 'core.*' -mtime -1 -exec file {} \; 2>/dev/null | grep -i core
+```
+
+### FALLBACK 2: CENTRALIZED LOGGING SYSTEM
+
+If core dump files are not found:
+```bash
+# Search through centralized logging system
+find /mnt/logs/aggregated/ -type f -name '*.log' -mtime -1 -exec grep -i error {} \; 2>/dev/null | head -20
+```
+
+### FALLBACK 3: INCIDENT REPORTS
+
+If logs are still not found:
+```json
+{"tool_calls": "rag_call", "query": "API gateway container crash incident report"}
+```
+
+### ULTIMATE ESCALATION: HUMAN REVIEW
+
+If all previous steps fail:
+- Manually review Docker logs from yesterday
+- Check for any container crash reports
+- Review system monitoring tools for anomalies
+
+### OUTPUT FORMAT
+
+```markdown
+## API Gateway Error Logs
+
+### Primary Approach (Docker Logs)
+```bash
+docker logs --since=yesterday --until=yesterday --details $(docker ps --filter status=exited --format '{{.Names}}') 2>/dev/null | grep -i error
+```
+
+### Fallback 1: Core Dump Files
+```bash
+find /var/crash -type f -name 'core.*' -mtime -1 -exec file {} \; 2>/dev/null | grep -i core
+```
+
+### Fallback 2: Centralized Logging
+```bash
+find /mnt/logs/aggregated/ -type f -name '*.log' -mtime -1 -exec grep -i error {} \; 2>/dev/null | head -20
+```
+
+### Fallback 3: Incident Reports
+```json
+{"tool_calls": "rag_call", "query": "API gateway container crash incident report"}
+```
+
+### Ultimate Escalation
+- Manual review of logs and system monitoring tools
+```

@@ -1,0 +1,41 @@
+
+=== Loading YAML Configs ===
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/memory_prompts.yaml
+[INFO] Loaded YAML: memory_prompts.yaml
+Loading → /mnt/c/Users/pavit/rag-memory-agent/config/hier_terminal_prompts.yaml
+[INFO] Loaded YAML: hier_terminal_prompts.yaml
+
+=== Starting Tests ===
+
+===== TERMINAL AGENT TEST =====
+User Input: Our nightly deployment failed, and the rollback was blocked. The failure message mentioned an error in the `auth.py` file, specifically near the 'rate limiting middleware' function, which was recently refactored. Before checking the live logs, first see if there are any architecture documents in our codebase explaining the current rate limiting strategy (look for 'RateLimiter' or 'TokenBucket'). If that fails, find all python files modified in the last 48 hours containing the string 'JWT' or 'session' (indicating a change in authentication), and finally, verify if the deployment service is currently running.
+Output:
+ ### PRIMARY ACTION (Executable):
+To begin debugging, the best starting point is to search for architecture documents or code comments that explain the current rate limiting strategy. This involves using the `system_chroma_query` tool to look for mentions of 'RateLimiter' or 'TokenBucket' in the codebase.
+
+```json
+{"tool_calls": "system_chroma_query", "query": "RateLimiter OR TokenBucket architecture"}
+```
+
+### FALLBACK STEPS (Hierarchy):
+If the primary action fails to yield relevant results, the next steps would be:
+
+1. **Fallback Step 1:** Search for Python files modified in the last 48 hours containing the strings 'JWT' or 'session'. This can be achieved using a `bash` command.
+
+```bash
+find . -name "*.py" -mtime -2 -exec grep -lE "JWT|session" {} \; | head -10
+```
+
+2. **Fallback Step 2:** Verify if the deployment service is currently running using a `bash` command.
+
+```bash
+systemctl status deployment-service || ps aux | grep deployment
+```
+
+3. **Fallback Step 3 (if needed):** If previous steps do not resolve the issue, and there's a need to inspect live logs, use a `bash` command to tail the logs.
+
+```bash
+tail -f /var/log/deployment.log | grep -E "error|exception"
+```
+
+These steps follow the hierarchical approach of first seeking semantic understanding, then using brute force search, and finally verifying system states.

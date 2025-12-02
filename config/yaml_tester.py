@@ -64,7 +64,7 @@ def test_terminal_agent(cfg):
     sys_prompt = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
     user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]
 
-    test_input = """Find and analyze the error logs from our API gateway containers that crashed yesterday. First check the standard Docker logs location, but if those are rotated or missing, look for any core dump files in /var/crash, and if that doesn't work, search through our centralized logging system in /mnt/logs/aggregated/. Also, check if there are any incident reports filed about this in our wiki at /wiki/incidents."""
+    test_input = """Our nightly deployment failed, and the rollback was blocked. The failure message mentioned an error in the `auth.py` file, specifically near the 'rate limiting middleware' function, which was recently refactored. Before checking the live logs, first see if there are any architecture documents in our codebase explaining the current rate limiting strategy (look for 'RateLimiter' or 'TokenBucket'). If that fails, find all python files modified in the last 48 hours containing the string 'JWT' or 'session' (indicating a change in authentication), and finally, verify if the deployment service is currently running."""
     user_prompt = user_template.replace("{{user_input}}", test_input)
 
     output = call_model(sys_prompt, user_prompt)

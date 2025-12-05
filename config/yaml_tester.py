@@ -60,6 +60,7 @@ def test_memory_agent(cfg):
     print("Output:\n", output)
 
 def test_terminal_agent(cfg):
+    
     print("\n===== TERMINAL AGENT TEST =====")
     sys_prompt = cfg["terminal_prompts"]["terminal_agent"]["system_prompt"]
     user_template = cfg["terminal_prompts"]["terminal_agent"]["user_prompt"]

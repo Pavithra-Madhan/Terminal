@@ -8,7 +8,8 @@ services:
     container_name: mcp_shell_server
     ports:
       - "8001:8000" 
-    # REMOVED: volumes for server.py. Relying on Dockerfile COPY
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - mcp_network
     command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"] 
@@ -21,6 +22,8 @@ services:
     container_name: mcp_sqlite_server
     ports:
       - "8002:8000" 
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # KEEP: This volume is CRUCIAL for accessing your actual database file
       - ./memory.db:/app/memory.db 
@@ -38,6 +41,8 @@ services:
     container_name: mcp_python_server
     ports:
       - "8003:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # REMOVED: volumes for server.py. Relying on Dockerfile COPY
     networks:
       - mcp_network
@@ -51,6 +56,8 @@ services:
     container_name: mcp_fetch_server
     ports:
       - "8004:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # REMOVED: volumes for server.py. Relying on Dockerfile COPY
     networks:
       - mcp_network

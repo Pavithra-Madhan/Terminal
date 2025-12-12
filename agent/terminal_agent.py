@@ -1,257 +1,203 @@
 import os
-import yaml
+import requests 
 import json
-import requests
-import re
-from pathlib import Path
-from huggingface_hub import InferenceClient
+import yaml 
+from google import genai
+from google.genai.errors import APIError
 
-# ================= CONFIG =================
-HF_TOKEN = os.getenv("HF_API_TOKEN")
-if not HF_TOKEN:
-    raise RuntimeError("Set HF_API_TOKEN in your environment")
+# --- Configuration (Gemini API) ---
 
-client = InferenceClient(token=HF_TOKEN)
+# Get your API key from environment variable
+# You MUST set this in your terminal: export GEMINI_API_KEY="AIzaSy...your...key...here"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Project root and config
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CONFIG_DIR = PROJECT_ROOT / "config"
+if not GEMINI_API_KEY:
+    print("FATAL: GEMINI_API_KEY environment variable not set. Please get a key from Google AI Studio and set it.")
+    exit()
 
-def load_yaml(filename: str):
-    filepath = CONFIG_DIR / filename
+# The model known for speed and great instruction following
+GEMINI_MODEL = "gemini-2.5-flash" 
+
+# --- Tool Definitions (MCP Service Endpoints) ---
+
+# NOTE: The host is 'host.docker.internal' so the agent running locally
+# can connect to the services running inside the Docker network (after the docker-compose fix).
+# FINAL FIX: Using the verified Docker Gateway IP to bypass NameResolutionError
+HOST_URL = "http://172.18.0.1"
+
+# The list of your four Microservice Control Protocol (MCP) tools
+TOOLS = [
+    {
+        "name": "SHELL_COMMAND",
+        "purpose": "Execute arbitrary BASH commands (ls, find, cat, git, etc.) in a sandboxed, read-only filesystem to check live system state, file existence, and permissions. Use this for real-time filesystem checks.",
+        "port": 8001,
+        "endpoint": "/execute_shell"
+    },
+    {
+        "name": "SYSTEM_SQLITE",
+        "purpose": "Query the internal, structured knowledge base (memory.db) for exact facts like port numbers, service configurations, and file metadata (path, purpose). Use this for fast, structured data lookups.",
+        "port": 8002,
+        "endpoint": "/execute_query"
+    },
+    {
+        "name": "PYTHON_EVAL",
+        "purpose": "Execute complex or large Python code snippets for calculations, data manipulation, or advanced string processing. The output is the value of the 'result' variable.",
+        "port": 8003,
+        "endpoint": "/execute_python"
+    },
+    {
+        "name": "FETCH_WEB",
+        "purpose": "Fetch the content of a public URL (web page) for external documentation or up-to-date information.",
+        "port": 8004,
+        "endpoint": "/fetch_url"
+    },
+]
+
+# Function to dynamically generate the LLM's system prompt from the tools list and YAML
+def generate_system_prompt(tools):
+    tool_descriptions = "\n\n".join([
+        f"Tool Name: {tool['name']}\nPurpose: {tool['purpose']}\nEndpoint: {tool['endpoint']}"
+        for tool in tools
+    ])
+
     try:
-        with open(filepath, "r") as f:
-            data = yaml.safe_load(f)
-        print(f"[INFO] Loaded YAML: {filepath}")
-        return data
+        # Construct the path to the YAML file relative to the script location
+        config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'hier_terminal_prompts.yaml')
+        with open(config_path, 'r') as f:
+            yaml_config = yaml.safe_load(f)
+            # Assuming your core instruction is under a key like 'ROLE' or 'system_prompt'
+            core_instruction = yaml_config.get('ROLE', yaml_config.get('system_prompt', 'You are a specialized debugging and execution agent...'))
+    except FileNotFoundError:
+        print(f"Error: Config file not found. Using hardcoded instruction.")
+        core_instruction = "You are a specialized debugging and execution agent. You must act as a Terminal Agent Dispatcher. Analyze the user's request and formulate a multi-step plan based on tool hierarchy, starting with the most efficient PRIMARY ACTION."
     except Exception as e:
-        print(f"[ERROR] Failed loading YAML {filepath}: {e}")
-        return None
+        print(f"Error loading YAML: {e}")
+        core_instruction = "You are a specialized debugging and execution agent. You must act as a Terminal Agent Dispatcher. Analyze the user's request and formulate a multi-step plan based on tool hierarchy, starting with the most efficient PRIMARY ACTION."
 
-# ================= MCP CLIENT - FIXED =================
-class MCP:
-    # Map logical tool names to MCP server URLs WITH /call endpoint
-    servers = {
-        "shell":  "http://localhost:8001",
-        "fs":     "http://localhost:8002",
-        "fetch":  "http://localhost:8003",
-        "python": "http://localhost:8004",
-    }
+    # Insert the tool details and the hierarchy instructions into the core prompt
+    system_prompt = f"""
+    {core_instruction}
 
-    @classmethod
-    def execute(cls, tool_call: dict):
-        """
-        FIXED: Your MCP servers expect POST to /call endpoint with:
-        {
-            "name": "tool_name",       # e.g., "bash", "read", "get", "exec"
-            "arguments": {...}         # Tool-specific arguments
-        }
-        """
-        server_name = tool_call.get("tool_call")  # "shell", "fs", etc.
-        if server_name not in cls.servers:
-            return {"error": f"Unknown MCP server: {server_name}"}
-
-        # Map endpoint to actual tool names YOUR servers use
-        endpoint = tool_call.get("endpoint", "/exec")
-        
-        # Your servers use these tool names:
-        if server_name == "shell":
-            tool_name = "bash"
-            arguments = {"prompt": tool_call.get("payload", {}).get("command", "")}
-        elif server_name == "fs":
-            if endpoint == "/read":
-                tool_name = "read"
-                arguments = {"path": tool_call.get("payload", {}).get("path", "")}
-            else:  # /write
-                tool_name = "write"
-                arguments = {
-                    "path": tool_call.get("payload", {}).get("path", ""),
-                    "content": tool_call.get("payload", {}).get("content", "")
-                }
-        elif server_name == "fetch":
-            tool_name = "get"
-            arguments = {"url": tool_call.get("payload", {}).get("url", "")}
-        elif server_name == "python":
-            tool_name = "exec"
-            arguments = {"code": tool_call.get("payload", {}).get("code", "")}
-        else:
-            tool_name = endpoint.replace("/", "")
-            arguments = tool_call.get("payload", {})
-        
-        # Build CORRECT payload for YOUR servers
-        payload = {
-            "name": tool_name,
-            "arguments": arguments
-        }
-        
-        url = f"{cls.servers[server_name]}/call"  # FIXED: Use /call endpoint
-        
-        try:
-            response = requests.post(url, json=payload, timeout=10)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            return {
-                "error": f"MCP call failed: {str(e)}",
-                "server": server_name,
-                "url": url,
-                "payload": payload
-            }
-
-# ================= LLM BRAIN =================
-def call_llm(system_prompt: str, user_prompt: str, max_tokens=512):
-    """
-    Calls HF InferenceClient to get the primary action
-    Output must follow the YAML: single best SQL/BASH/JSON block
-    """
-    resp = client.chat.completions.create(
-        model="Qwen/Qwen2.5-7B-Instruct",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0.0,
-        max_tokens=max_tokens
-    )
-    return resp.choices[0].message.content
-
-# ================= TOOL EXTRACTION - FIXED =================
-def extract_tool_call(text: str):
-    """
-    FIXED: Extract JSON from code blocks properly
-    Your agent outputs:
-    ```json
-    {"tool_call": "shell", "endpoint": "/exec", "payload": {"command": "ls"}}
-    ```
-    """
-    # Look for JSON code block
-    json_match = re.search(r'```json\n(.*?)\n```', text, re.DOTALL)
-    if json_match:
-        try:
-            return json.loads(json_match.group(1))
-        except json.JSONDecodeError:
-            pass
+    --- AVAILABLE TOOLS ---
+    {tool_descriptions}
     
-    # Also try to find any JSON in the text
+    --- HIERARCHY OF TOOL USAGE (PRIORITY) ---
+    1. **SYSTEM_SQLITE**: For fast, structured fact-checks (ports, configs, file metadata).
+    2. **PYTHON_EVAL/SHELL_COMMAND**: For immediate, verifiable action/state checks (calculations, 'ls', 'git log').
+    3. **FETCH_WEB**: For external, real-time data.
+    4. **RAG/CHROMA**: For deep, semantic search in unstructured knowledge (documentation, incident reports).
+
+    --- RESPONSE FORMAT ---
+    You MUST output a two-part response following this structure:
+    1. A section starting with '### PRIMARY ACTION (Executable):' containing your single, immediate, most efficient command (SQL or BASH) or a brief rationale.
+    2. A section starting with '### FALLBACK STEPS (Hierarchy):' containing the remaining steps of the multi-step plan, prioritized by the hierarchy above, complete with the suggested command or query for each step.
+    """
+    return system_prompt
+
+# Function to call the LLM and get the structured plan
+def get_execution_plan(user_input, system_prompt):
+    print("--- Calling Google Gemini API (Free Tier) ---")
+    
     try:
-        # Look for {...} pattern
-        json_pattern = r'\{[^{}]*"tool_call"[^{}]*\}'
-        match = re.search(json_pattern, text)
-        if match:
-            return json.loads(match.group())
-    except:
-        pass
-    
-    return None
-
-# ================= DEBUG MCP =================
-def debug_mcp_connection():
-    """Test if MCP servers are reachable"""
-    print("\n🧪 DEBUG: Testing MCP servers...")
-    
-    for server, base_url in MCP.servers.items():
-        print(f"\n  Testing {server} server:")
+        client = genai.Client(api_key=GEMINI_API_KEY)
         
-        # Test /health
-        try:
-            resp = requests.get(f"{base_url}/health", timeout=2)
-            print(f"    GET /health: {resp.status_code} - {resp.text}")
-        except Exception as e:
-            print(f"    GET /health: FAILED - {e}")
-            return False
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[
+                {"role": "user", "parts": [{"text": system_prompt}]},
+                {"role": "model", "parts": [{"text": "Understood. I will follow the hierarchy and structured format."}]},
+                {"role": "user", "parts": [{"text": user_input}]}
+            ],
+            config={"temperature": 0.0}
+        )
         
-        # Test that server exists
-        try:
-            resp = requests.get(base_url, timeout=2)
-            print(f"    GET /: {resp.status_code}")
-        except:
-            print(f"    GET /: No response (but /health works)")
-    
-    # Test actual MCP call
-    print("\n  Testing sample MCP call:")
-    test_call = {
-        "tool_call": "shell",
-        "endpoint": "/exec",
-        "payload": {"command": "echo 'MCP test'"}
-    }
-    
-    result = MCP.execute(test_call)
-    print(f"    Result: {result}")
-    
-    return "error" not in str(result).lower()
+        return response.text
+    except APIError as e:
+        return f"LLM Error: Failed to generate response from Gemini API. Check your GEMINI_API_KEY and ensure access. Error: {e}"
+    except Exception as e:
+        return f"LLM Error: An unexpected error occurred: {e}"
 
-# ================= TERMINAL AGENT =================
-def terminal_agent(user_input: str, cfg: dict):
-    """
-    Main agent loop:
-    1. Send user input to LLM (brain)
-    2. LLM decides primary tool and generates minimal command/query
-    3. Extract MCP call JSON and send to correct MCP server
-    4. Show result
-    """
-    system_prompt = cfg["terminal_agent"]["system_prompt"]
-    user_template = cfg["terminal_agent"]["user_prompt"]
-    user_prompt = user_template.replace("{{user_input}}", user_input)
 
-    # Step 1: LLM decides what to do
-    print("\n[LLM THINKING...]")
-    llm_output = call_llm(system_prompt, user_prompt)
-    print("[LLM OUTPUT]:")
-    print(llm_output)
-
-    # Step 2: Extract tool call JSON
-    tool_call = extract_tool_call(llm_output)
+# Function to execute the PRIMARY ACTION (THIS IS THE CORRECTED PARSER)
+def execute_primary_action(plan_output):
     
-    if not tool_call:
-        print("\n❌ No tool call detected in LLM output")
-        print("LLM might have output bash/sql directly instead of JSON")
+    if "### PRIMARY ACTION (Executable):" not in plan_output:
+        return {"result": "Could not parse PRIMARY ACTION from LLM output. LLM did not follow the required output format."}
+
+    # Extract the primary action block
+    action_block = plan_output.split("### PRIMARY ACTION (Executable):")[1].split("### FALLBACK STEPS (Hierarchy):")[0].strip()
+
+    # --- START OF THE FIX: ROBUST PARSING ---
+    
+    # 1. Check for SQLITE action (using SQL code block or tool name)
+    if action_block.startswith("```sql") or "SYSTEM_SQLITE" in action_block:
+        tool_name = 'SYSTEM_SQLITE'
+        # Clean the command: remove code fences, tool name, and strip whitespace.
+        command = action_block.replace("```sql", "").replace("```", "").replace(f"{tool_name}:", "").strip()
+        mcp = next(t for t in TOOLS if t['name'] == tool_name)
+        api_data = {"query": command}
+    
+    # 2. Check for SHELL_COMMAND action (using BASH code block or tool name)
+    elif action_block.startswith("```bash") or "SHELL_COMMAND" in action_block:
+        tool_name = 'SHELL_COMMAND'
+        # Clean the command: remove code fences, tool name, and strip whitespace.
+        command = action_block.replace("```bash", "").replace("```", "").replace(f"{tool_name}:", "").strip()
+        mcp = next(t for t in TOOLS if t['name'] == tool_name)
+        api_data = {"command": command}
+    
+    # 3. Handle other tools/formats (PYTHON_EVAL, FETCH_WEB etc. would be added here)
+    # For now, we only handle the primary action types generated by the LLM
+    elif 'rationale' in action_block.lower() or 'no command' in action_block.lower():
+        return {"result": f"Primary Action is a rationale only (no executable command detected). Action: {action_block}"}
+    
+    else:
+        # Final safety net for unrecognizable format
+        return {"result": f"Primary Action is an unknown command format. No execution performed. Action: {action_block}"}
+
+    # --- END OF THE FIX ---
+
+    print(f"\n--- EXECUTING {mcp['name']} ---")
+    print(f"Command: {command}")
+    
+    try:
+        # Construct the full URL for the MCP
+        url = f"{HOST_URL}:{mcp['port']}{mcp['endpoint']}"
         
-        # Try to extract bash command directly
-        bash_match = re.search(r'```bash\n(.*?)\n```', llm_output, re.DOTALL)
-        if bash_match:
-            print("\n⚠️ Found bash command, converting to MCP call...")
-            tool_call = {
-                "tool_call": "shell",
-                "endpoint": "/exec",
-                "payload": {"command": bash_match.group(1).strip()}
-            }
-        else:
-            return
+        response = requests.post(url, json=api_data, timeout=10)
+        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+        
+        return response.json()
 
-    print(f"\n[EXTRACTED TOOL CALL]: {tool_call}")
+    except requests.exceptions.RequestException as e:
+        return {"error": f"Failed to connect to {mcp['name']} ({url}). Ensure Docker services are running and 'host.docker.internal' is correctly configured in docker-compose. Error: {e}"}
 
-    # Step 3: Execute with MCP
-    print("\n[EXECUTING VIA MCP...]")
-    mcp_result = MCP.execute(tool_call)
+# Main Dispatcher Logic
+def terminal_agent_dispatcher(user_input):
+    print("--- 1. Generating System Prompt and Tool Configuration ---")
+    system_prompt = generate_system_prompt(TOOLS)
     
-    # Step 4: Show result
-    print("\n[MCP RESULT]:")
-    print(json.dumps(mcp_result, indent=2))
+    print("\n--- 2. Requesting LLM Reasoning and Action Plan ---")
+    plan_output = get_execution_plan(user_input, system_prompt)
+    print("\n" + plan_output)
 
-# ================= ENTRY POINT =================
-def main():
-    print("🚀 Starting Terminal Agent with MCP Integration")
+    print("\n--- 3. Executing Primary Action ---")
+    action_result = execute_primary_action(plan_output)
     
-    # Debug MCP connection first
-    if not debug_mcp_connection():
-        print("\n❌ MCP servers not ready!")
-        print("Make sure servers are running:")
-        print("  docker ps")
-        print("If not, run: docker start shell-server fs-server fetch-server python-server")
-        return
+    print("\n--- PRIMARY ACTION RESULT (New Context) ---")
+    print(json.dumps(action_result, indent=2))
     
-    # Load config
-    cfg = load_yaml("hier_terminal_prompts.yaml")
-    if cfg is None:
-        return
-    
-    # Example usage
-    print("\n" + "="*50)
-    user_input = "List files in current directory"
-    print(f"QUERY: {user_input}")
-    print("="*50)
-    
-    terminal_agent(user_input, cfg)
 
 if __name__ == "__main__":
-    main()
+    # The complex debugging query that forces the LLM to use its hierarchy
+    test_query = "I'm debugging a memory leak in our data processing pipeline. First, I need to find all configuration files that might have Redis connection pool settings changed around that time. Check git history if available, otherwise look at file modification dates."
+    
+    print("\n=======================================================")
+    print(f"USER QUERY: {test_query}")
+    print("=======================================================")
+    
+    # Ensure your Docker services are UP before running this!
+    terminal_agent_dispatcher(test_query)
+    
+    print("\n=======================================================")
+    print("DEMONSTRATION COMPLETE.")
+    print("=======================================================")

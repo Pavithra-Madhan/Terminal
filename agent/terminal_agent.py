@@ -189,7 +189,7 @@ def terminal_agent_dispatcher(user_input):
 
 if __name__ == "__main__":
     # The complex debugging query that forces the LLM to use its hierarchy
-    test_query = "I'm debugging a memory leak in our data processing pipeline. First, I need to find all configuration files that might have Redis connection pool settings changed around that time. Check git history if available, otherwise look at file modification dates."
+    test_query = "I need to confirm the database connectivity. Run a simple query against the file_metadata table in the database to retrieve the path and last modified time for all records."
     
     print("\n=======================================================")
     print(f"USER QUERY: {test_query}")

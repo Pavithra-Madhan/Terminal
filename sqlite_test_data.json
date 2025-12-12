@@ -1,0 +1,1 @@
+{"query": "SELECT name FROM sqlite_master WHERE type=\x27table\x27 LIMIT 1;"}

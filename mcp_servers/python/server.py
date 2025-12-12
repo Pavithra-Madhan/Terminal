@@ -1,23 +1,30 @@
+# python_mcp_server.py
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import uvicorn
-import subprocess
-import requests
-import os
 
-app = FastAPI(title="${server} server")
+app = FastAPI()
 
-class ToolRequest(BaseModel):
-    name: str
-    arguments: dict
+class PythonCode(BaseModel):
+    code: str
 
-@app.post("/call")
-async def call_tool(request: ToolRequest):
-    return {"result": "Tool ${server} is working!"}
+@app.post("/execute_python")
+async def execute_python(request: PythonCode):
+    code = request.code
+    
+    # Simple security check (still needed to prevent immediate file/system access)
+    if any(keyword in code for keyword in ['os.', 'sys.', 'open(', 'import ', 'while', 'def']):
+        raise HTTPException(status_code=403, detail="Restricted keyword found. Only simple math and assignments are allowed.")
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+    try:
+        local_scope = {}
+        exec(code, {'__builtins__': None}, local_scope) 
+        
+        if 'result' in local_scope:
+            return {"status": "success", "output": local_scope['result']}
+        elif 'output' in local_scope:
+            return {"status": "success", "output": local_scope['output']}
+        else:
+             return {"status": "success", "output": "Code executed but no explicit 'result' variable found."}
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Python Execution Error: {str(e)}")

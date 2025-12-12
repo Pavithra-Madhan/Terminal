@@ -1,53 +1,62 @@
-version: "3.9"
 services:
-  fs:
-    build: ./mcp_servers/fs
-    container_name: mcp-fs-server
-    ports:
-      - "8001:8000"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
-  fetch:
-    build: ./mcp_servers/fetch
-    container_name: mcp-fetch-server
+  # 1. SHELL MCP Server (BASH Commands)
+  shell_mcp:
+    build:
+      context: ./mcp_servers/shell
+      dockerfile: Dockerfile 
+    container_name: mcp_shell_server
     ports:
-      - "8002:8000"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      - "8001:8000" 
+    # REMOVED: volumes for server.py. Relying on Dockerfile COPY
+    networks:
+      - mcp_network
+    command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"] 
 
-  python:
-    build: ./mcp_servers/python
-    container_name: mcp-python-server
+  # 2. SQLITE MCP Server (Read-Only SELECT Queries)
+  sqlite_mcp:
+    build:
+      context: ./mcp_servers/fs
+      dockerfile: Dockerfile
+    container_name: mcp_sqlite_server
+    ports:
+      - "8002:8000" 
+    volumes:
+      # KEEP: This volume is CRUCIAL for accessing your actual database file
+      - ./memory.db:/app/memory.db 
+    environment:
+      - DB_PATH=/app/memory.db 
+    networks:
+      - mcp_network
+    command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  # 3. PYTHON MCP Server (Python Code Evaluation)
+  python_mcp:
+    build:
+      context: ./mcp_servers/python
+      dockerfile: Dockerfile
+    container_name: mcp_python_server
     ports:
       - "8003:8000"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
-  shell:
-    build: ./mcp_servers/shell
-    container_name: mcp-shell-server
+    # REMOVED: volumes for server.py. Relying on Dockerfile COPY
+    networks:
+      - mcp_network
+    command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+      
+  # 4. FETCH MCP Server (Web Scraping/HTTP Calls)
+  fetch_mcp:
+    build:
+      context: ./mcp_servers/fetch
+      dockerfile: Dockerfile
+    container_name: mcp_fetch_server
     ports:
       - "8004:8000"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+    # REMOVED: volumes for server.py. Relying on Dockerfile COPY
+    networks:
+      - mcp_network
+    command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Define a shared network
+networks:
+  mcp_network:
+    driver: bridge

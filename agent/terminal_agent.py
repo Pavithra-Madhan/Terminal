@@ -2,118 +2,247 @@ import os
 import requests
 import json
 import yaml
+from huggingface_hub import InferenceClient
 
-# --- Configuration (Hugging Face) ---
-HF_TOKEN = os.environ.get("HUGGINGFACE_TOKEN")
-if not HF_TOKEN:
-    print("FATAL: HUGGINGFACE_TOKEN environment variable not set.")
+# --- Configuration (Hugging Face API) ---
+
+# You MUST set this in your terminal:
+# export HUGGINGFACEHUB_API_TOKEN="hf_xxx"
+HF_API_TOKEN = os.environ.get("HUGGINGFACEHUB_API_TOKEN")
+
+if not HF_API_TOKEN:
+    print("FATAL: HUGGINGFACEHUB_API_TOKEN environment variable not set.")
     exit()
 
-# Use YOUR Llama-4-Scout model
-HF_MODEL = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+# Fast, strong instruction-following model
+HF_MODEL = "Qwen/Qwen2.5-72B-Instruct"
 
-# --- Tool Definitions ---
+# --- Tool Definitions (MCP Service Endpoints) ---
+
+HOST_URL = "http://localhost" 
+
 TOOLS = [
-    {"name": "SHELL_COMMAND", "port": 8001, "endpoint": "/execute_shell"},
-    {"name": "SYSTEM_SQLITE", "port": 8002, "endpoint": "/execute_query"},
-    {"name": "PYTHON_EVAL", "port": 8003, "endpoint": "/execute_python"},
-    {"name": "FETCH_WEB", "port": 8004, "endpoint": "/fetch_url"},
+    {
+        "name": "SHELL_COMMAND",
+        "purpose": "Execute arbitrary BASH commands (ls, find, cat, git, etc.) in a sandboxed, read-only filesystem to check live system state, file existence, and permissions. Use this for real-time filesystem checks.",
+        "port": 8001,
+        "endpoint": "/execute_shell"
+    },
+    {
+        "name": "SYSTEM_SQLITE",
+        "purpose": "Query the internal, structured knowledge base (memory.db) for exact facts like port numbers, service configurations, and file metadata (path, purpose). Use this for fast, structured data lookups.",
+        "port": 8002,
+        "endpoint": "/execute_query"
+    },
+    {
+        "name": "PYTHON_EVAL",
+        "purpose": "Execute complex or large Python code snippets for calculations, data manipulation, or advanced string processing. The output is the value of the 'result' variable.",
+        "port": 8003,
+        "endpoint": "/execute_python"
+    },
+    {
+        "name": "FETCH_WEB",
+        "purpose": "Fetch the content of a public URL (web page) for external documentation or up-to-date information.",
+        "port": 8004,
+        "endpoint": "/fetch_url"
+    },
 ]
 
-HOST_URL = "http://localhost"
+# Function to dynamically generate the LLM's system prompt
+def generate_system_prompt(tools):
+    tool_descriptions = "\n\n".join([
+        f"Tool Name: {tool['name']}\nPurpose: {tool['purpose']}\nEndpoint: {tool['endpoint']}"
+        for tool in tools
+    ])
 
-# --- Helper Functions ---
-def load_tools_from_yaml():
-    config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'hier_terminal_prompts.yaml')
     try:
+        config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'hier_terminal_prompts.yaml')
         with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-            return config.get('terminal_agent', {}).get('system_prompt', 'Default prompt')
-    except FileNotFoundError:
-        return "You are a specialized debugging and execution agent."
+            yaml_config = yaml.safe_load(f)
+            core_instruction = yaml_config.get(
+                'ROLE',
+                yaml_config.get(
+                    'system_prompt',
+                    'You are a specialized debugging and execution agent...'
+                )
+            )
+    except Exception:
+        core_instruction = (
+            "You are a specialized debugging and execution agent. "
+            "You must act as a Terminal Agent Dispatcher. "
+            "Analyze the user's request and formulate a multi-step plan "
+            "based on tool hierarchy."
+        )
 
-def call_hf_model(system_prompt, user_input):
-    """Call Hugging Face Router API (the correct endpoint)."""
-    # ✅ CORRECT ENDPOINT: Use router.huggingface.co
-    url = "https://router.huggingface.co/v1/chat/completions"
-    
-    headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    
-    # Format messages for chat model
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_input}
-    ]
-    
-    payload = {
-        "model": HF_MODEL,
-        "messages": messages,
-        "max_tokens": 1000,
-        "temperature": 0.0,
-        "stream": False
-    }
-    
+    system_prompt = f"""
+{core_instruction}
+
+--- AVAILABLE TOOLS ---
+{tool_descriptions}
+
+--- HIERARCHY OF TOOL USAGE (PRIORITY) ---
+1. SYSTEM_SQLITE
+2. PYTHON_EVAL / SHELL_COMMAND
+3. FETCH_WEB
+4. RAG / CHROMA
+
+--- RESPONSE FORMAT ---
+You MUST output:
+### PRIMARY ACTION (Executable):
+### FALLBACK STEPS (Hierarchy):
+"""
+    return system_prompt
+
+
+# --- HF LLM CALL (REPLACEMENT FOR GEMINI) ---
+def get_execution_plan(user_input, system_prompt):
+    print("--- Calling Hugging Face Inference API ---")
+
     try:
-        print(f"Calling model: {HF_MODEL}")
-        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        client = InferenceClient(
+            model=HF_MODEL,
+            token=HF_API_TOKEN
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "assistant", "content": "Understood. I will follow the hierarchy and structured format."},
+            {"role": "user", "content": user_input}
+        ]
+
+        response = client.chat_completion(
+            messages=messages,
+            temperature=0.0,
+            max_tokens=1024
+        )
+
+        return response.choices[0].message.content
+
+    except Exception as e:
+        return f"LLM Error: {e}"
+
+
+# --- PRIMARY ACTION EXECUTOR (UNCHANGED) ---
+def execute_primary_action(plan_output):
+    
+    if "### PRIMARY ACTION (Executable):" not in plan_output:
+        return {"result": "Could not parse PRIMARY ACTION from LLM output."}
+
+    action_block = plan_output.split(
+        "### PRIMARY ACTION (Executable):"
+    )[1].split(
+        "### FALLBACK STEPS (Hierarchy):"
+    )[0].strip()
+    
+    print(f"\n--- DEBUG: Raw action block ---\n{action_block}")
+    
+    # 🔥 FIXED: Handle the #### SYSTEM_SQLITE header properly
+    if "```sql" in action_block or "SYSTEM_SQLITE" in action_block:
+        tool_name = "SYSTEM_SQLITE"
         
+        # FIRST: Remove markdown headers (#### SYSTEM_SQLITE)
+        cleaned = action_block.replace("#### SYSTEM_SQLITE", "").replace("# SYSTEM_SQLITE", "")
+        
+        # THEN: Extract SQL from code blocks
+        if "```sql" in cleaned:
+            # Extract between ```sql and ```
+            parts = cleaned.split("```sql")
+            if len(parts) > 1:
+                command = parts[1].split("```")[0].strip()
+            else:
+                command = cleaned.replace("```sql", "").replace("```", "").strip()
+        else:
+            # No code blocks, just clean up
+            command = cleaned.replace("SYSTEM_SQLITE:", "").replace("SYSTEM_SQLITE", "").strip()
+        
+        mcp = next(t for t in TOOLS if t["name"] == tool_name)
+        api_data = {"query": command, "db_name": "system"}
+        
+        print(f"--- DEBUG: Cleaned command ---\n{command}")
+
+    elif action_block.startswith("```bash") or "SHELL_COMMAND" in action_block:
+        tool_name = "SHELL_COMMAND"
+        command = (
+            action_block.replace("```bash", "")
+            .replace("```", "")
+            .replace(f"{tool_name}:", "")
+            .replace(f"#### {tool_name}", "")
+            .replace(f"# {tool_name}", "")
+            .strip()
+        )
+        mcp = next(t for t in TOOLS if t["name"] == tool_name)
+        api_data = {"command": command}
+
+    elif "rationale" in action_block.lower():
+        return {"result": action_block}
+
+    else:
+        return {"result": f"Unknown action format: {action_block}"}
+
+    print(f"\n--- EXECUTING {mcp['name']} ---")
+    print(f"Final Command: '{command}'")
+    print(f"Payload: {json.dumps(api_data, indent=2)}")
+
+    try:
+        url = f"{HOST_URL}:{mcp['port']}{mcp['endpoint']}"
+        print(f"URL: {url}")
+        
+        response = requests.post(url, json=api_data, timeout=10)
         print(f"Response Status: {response.status_code}")
         
-        response.raise_for_status()
-        result = response.json()
-        
-        # Extract response
-        generated_text = result["choices"][0]["message"]["content"]
-        print("✓ API call successful")
-        return generated_text
-        
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 401:
-            return "Error 401: Unauthorized. Check your HUGGINGFACE_TOKEN."
-        elif e.response.status_code == 404:
-            return f"Error 404: Model '{HF_MODEL}' not found via router."
-        elif e.response.status_code == 503:
-            return f"Error 503: Model loading. Try again in 30s."
-        elif e.response.status_code == 429:
-            return "Error 429: Rate limited. Wait a minute."
-        else:
+        if response.status_code == 403:
+            # Get more details about the 403
             try:
-                error_detail = e.response.json()
-                return f"HTTP Error {e.response.status_code}: {error_detail}"
+                error_detail = response.json()
+                return {
+                    "error": "403 Forbidden from server",
+                    "detail": error_detail,
+                    "payload_sent": api_data
+                }
             except:
-                return f"HTTP Error {e.response.status_code}"
-                
-    except KeyError as e:
-        return f"Parse error: {e}. Response: {result if 'result' in locals() else 'N/A'}"
-    except Exception as e:
-        return f"Error: {str(e)}"
+                return {
+                    "error": f"403 Forbidden (no details)",
+                    "status_code": 403,
+                    "payload_sent": api_data
+                }
+        
+        response.raise_for_status()
+        return response.json()
 
-# ... keep the rest of your functions unchanged (parse_and_execute_action, terminal_agent_dispatcher, etc.)
+    except requests.exceptions.RequestException as e:
+        return {"error": str(e)}
 
-# --- Main Test ---
+
+# --- MAIN DISPATCHER (UNCHANGED) ---
+def terminal_agent_dispatcher(user_input):
+    print("--- 1. Generating System Prompt ---")
+    system_prompt = generate_system_prompt(TOOLS)
+
+    print("\n--- 2. Requesting LLM Plan ---")
+    plan_output = get_execution_plan(user_input, system_prompt)
+    print("\n" + plan_output)
+
+    print("\n--- 3. Executing Primary Action ---")
+    action_result = execute_primary_action(plan_output)
+
+    print("\n--- PRIMARY ACTION RESULT ---")
+    print(json.dumps(action_result, indent=2))
+
+
 if __name__ == "__main__":
     test_query = (
-        "I'm getting 'Connection refused' errors when trying to query the system database. "
-        "The FastAPI server log shows it started on port 8000, but my app gets errors on localhost:8002. "
-        "Docker Compose shows the sqlite_mcp container is running. "
-        "Diagnose the networking issue."
+        "I need to confirm the database connectivity. "
+        "Run a simple query against the file_metadata table "
+        "to retrieve the path and last modified time for all records."
     )
-    
-    print("\n" + "="*60)
+
+    print("\n=======================================================")
     print(f"USER QUERY: {test_query}")
-    print("="*60)
-    
-    # Direct test to see what we get
-    system_prompt = load_tools_from_yaml()
-    print("--- Calling LLM ---")
-    output = call_hf_model(system_prompt, test_query)
-    print(f"\nRAW OUTPUT:\n{output}")
-    
-    # Quick check
-    if "### PRIMARY ACTION" in output:
-        print("\n✓ Format looks good!")
-    else:
-        print("\n⚠️  No PRIMARY ACTION found.")
+    print("=======================================================")
+
+    terminal_agent_dispatcher(test_query)
+
+    print("\n=======================================================")
+    print("DEMONSTRATION COMPLETE.")
+    print("=======================================================")
+

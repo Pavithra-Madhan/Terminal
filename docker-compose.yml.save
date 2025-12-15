@@ -15,22 +15,18 @@ services:
 
   # 2. SQLITE MCP Server (Read-Only SELECT Queries)
   sqlite_mcp:
-    build:
-      context: ./mcp_servers/fs
-      dockerfile: Dockerfile
-    container_name: mcp_sqlite_server
-    ports:
-      - "8002:8000"
+  build:
+    context: ./mcp_servers/fs
+    dockerfile: Dockerfile
+  container_name: mcp_sqlite_server
+  ports:
+    - "8002:8000"
   # ADD SELINUX :Z FLAG FOR FEDORA
-    volumes:
-      - ./system.db:/app/system.db:Z,ro
-      - ./memory.db:/app/memory.db:Z,ro
-  # ADD THIS ENVIRONMENT BLOCK - REQUIRED BY server.py
-    environment:
-      - SYSTEM_DB_PATH=/app/system.db
-      - USER_PREFS_DB_PATH=/app/memory.db
-    networks:
-      - mcp_network
+  volumes:
+    - ./system.db:/app/system.db:Z,ro
+    - ./memory.db:/app/memory.db:Z,ro
+  networks:
+    - mcp_network
   # 3. PYTHON MCP Server (Python Code Evaluation)
   python_mcp:
     build:
@@ -65,3 +61,6 @@ services:
 networks:
   mcp_network:
     driver: bridge
+
+
+

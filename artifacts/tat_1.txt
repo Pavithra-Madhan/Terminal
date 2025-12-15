@@ -1,0 +1,178 @@
+============================================================
+USER QUERY: I'm building a Python microservice that processes user uploads. The service logs show: 
+"ERROR: Failed to parse upload metadata. Expected field 'upload_timestamp' missing from row 42."
+The upload handler reads from a SQLite table named 'user_uploads' in the 'system' database.
+The FastAPI endpoint at /api/uploads returns 500 Internal Server Error when querying uploads from the last 24 hours.
+The logs also show Docker container 'upload-processor' restarting every 5 minutes with exit code 137 (OOM killer?).
+
+Diagnose the full stack: database schema, API endpoint, Docker memory, and provide a fix plan.
+============================================================
+--- 1. Generating System Prompt ---
+
+--- 2. Requesting LLM Plan ---
+--- Calling Hugging Face Inference API ---
+
+### PRIMARY ACTION (Executable):
+
+#### Step 1: Verify Database Schema
+First, we need to ensure that the `user_uploads` table has the expected schema, specifically the `upload_timestamp` field.
+
+**SYSTEM_SQLITE Query:**
+```sql
+PRAGMA table_info(user_uploads);
+```
+
+**Endpoint:** `/execute_query`
+
+#### Step 2: Check API Endpoint Logic
+We need to review the FastAPI endpoint logic to ensure it correctly handles the query and processes the data.
+
+**PYTHON_EVAL Code:**
+```python
+# Example of how to inspect the FastAPI endpoint
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+app = FastAPI()
+
+@app.get("/api/uploads")
+def get_uploads():
+    # Simulate the logic of the endpoint
+    # This is a placeholder for the actual logic
+    return {"message": "This is a test response"}
+
+client = TestClient(app)
+
+response = client.get("/api/uploads")
+print(response.status_code, response.json())
+```
+
+**Endpoint:** `/execute_python`
+
+#### Step 3: Check Docker Memory Usage
+We need to verify the memory usage of the Docker container to understand why it is being killed by the OOM killer.
+
+**SHELL_COMMAND:**
+```bash
+docker stats --no-stream
+```
+
+**Endpoint:** `/execute_shell`
+
+### FALLBACK STEPS (Hierarchy):
+
+#### Step 4: Review Logs for More Context
+If the above steps do not provide enough information, we should review the logs for more context.
+
+**SHELL_COMMAND:**
+```bash
+docker logs upload-processor
+```
+
+**Endpoint:** `/execute_shell`
+
+#### Step 5: Check System Resources
+If the Docker container is consistently running out of memory, we need to check the overall system resources.
+
+**SHELL_COMMAND:**
+```bash
+free -m
+top -b -n 1
+```
+
+**Endpoint:** `/execute_shell`
+
+#### Step 6: Increase Docker Memory Limit
+If the issue is due to insufficient memory, we can increase the memory limit for the Docker container.
+
+**SHELL_COMMAND:**
+```bash
+docker update --memory=512m upload-processor
+```
+
+**Endpoint:** `/execute_shell`
+
+### Fix Plan:
+
+1. **Verify and Correct Database Schema:**
+   - If the `upload_timestamp` field is missing, add it to the `user_uploads` table.
+   ```sql
+   ALTER TABLE user_uploads ADD COLUMN upload_timestamp TEXT;
+   ```
+
+2. **Update API Endpoint Logic:**
+   - Ensure the FastAPI endpoint correctly handles the query and processes the data.
+   - Add error handling to log any issues and return appropriate HTTP responses.
+
+3. **Optimize Memory Usage:**
+   - Review the code for any memory-intensive operations and optimize them.
+   - Increase the memory limit for the Docker container if necessary.
+
+4. **Monitor and Log:**
+   - Implement logging to capture more detailed information about the errors and resource usage.
+   - Use monitoring tools to track the performance and resource usage of the Docker container.
+
+By following these steps, we can diagnose and fix the issues with the database schema, API endpoint, and Docker container memory usage.
+
+--- 3. Executing Primary Action ---
+
+--- DEBUG: Raw action block ---
+#### Step 1: Verify Database Schema
+First, we need to ensure that the `user_uploads` table has the expected schema, specifically the `upload_timestamp` field.
+
+**SYSTEM_SQLITE Query:**
+```sql
+PRAGMA table_info(user_uploads);
+```
+
+**Endpoint:** `/execute_query`
+
+#### Step 2: Check API Endpoint Logic
+We need to review the FastAPI endpoint logic to ensure it correctly handles the query and processes the data.
+
+**PYTHON_EVAL Code:**
+```python
+# Example of how to inspect the FastAPI endpoint
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+app = FastAPI()
+
+@app.get("/api/uploads")
+def get_uploads():
+    # Simulate the logic of the endpoint
+    # This is a placeholder for the actual logic
+    return {"message": "This is a test response"}
+
+client = TestClient(app)
+
+response = client.get("/api/uploads")
+print(response.status_code, response.json())
+```
+
+**Endpoint:** `/execute_python`
+
+#### Step 3: Check Docker Memory Usage
+We need to verify the memory usage of the Docker container to understand why it is being killed by the OOM killer.
+
+**SHELL_COMMAND:**
+```bash
+docker stats --no-stream
+```
+
+**Endpoint:** `/execute_shell`
+--- DEBUG: Cleaned command ---
+PRAGMA table_info(user_uploads)
+
+--- EXECUTING SYSTEM_SQLITE ---
+Command: PRAGMA table_info(user_uploads)
+Response Status: 403
+
+--- PRIMARY ACTION RESULT ---
+{
+  "error": "403 Client Error: Forbidden for url: http://localhost:8002/execute_query"
+}
+
+============================================================
+DEMONSTRATION COMPLETE.
+============================================================

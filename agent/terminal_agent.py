@@ -172,7 +172,13 @@ def terminal_agent_dispatcher(user_input):
     print(json.dumps(action_result, indent=2))
 
 if __name__ == "__main__":
-    test_query = "I need to confirm the database connectivity. Run a simple query against the file_metadata table to retrieve the path and last modified time for all records."
+    test_query = """I'm building a Python microservice that processes user uploads. The service logs show: 
+"ERROR: Failed to parse upload metadata. Expected field 'upload_timestamp' missing from row 42."
+The upload handler reads from a SQLite table named 'user_uploads' in the 'system' database.
+The FastAPI endpoint at /api/uploads returns 500 Internal Server Error when querying uploads from the last 24 hours.
+The logs also show Docker container 'upload-processor' restarting every 5 minutes with exit code 137 (OOM killer?).
+
+Diagnose the full stack: database schema, API endpoint, Docker memory, and provide a fix plan."""
     
     print("\n" + "="*60)
     print(f"USER QUERY: {test_query}")
